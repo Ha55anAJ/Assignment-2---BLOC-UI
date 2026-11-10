@@ -4,6 +4,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lost_found/features/items/data/datasources/item_remote_data_source.dart';
 import 'package:lost_found/features/items/domain/entities/item.dart';
 
+/// A Firestore whose transactions always lose a race: another device claims
+/// the item first, so the security rules reject this commit with
+/// permission-denied (which is what the real server does).
+class LosingRaceFirestore extends FakeFirebaseFirestore {
+  /// Whether the other device should actually claim the item before this
+  /// commit is rejected.
+  bool otherDeviceClaims = true;
+
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async {
+    if (otherDeviceClaims) {
+      await collection('items').doc('a').update({'status': 'Claimed'});
+    }
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+  }
+}
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late ItemRemoteDataSource dataSource;
@@ -144,6 +168,38 @@ void main() {
 
     test('reports a deleted item as not found', () async {
       expect(await dataSource.claimItem('missing'), ClaimOutcome.notFound);
+    });
+
+    test('reports a race lost to another device as already claimed', () async {
+      final racing = LosingRaceFirestore();
+      await racing.collection('items').doc('a').set({
+        'title': 'Black Backpack',
+        'status': 'Found',
+      });
+
+      final outcome = await ItemRemoteDataSource(firestore: racing)
+          .claimItem('a');
+
+      expect(outcome, ClaimOutcome.alreadyClaimed);
+    });
+
+    test('rethrows a real permission error', () async {
+      final racing = LosingRaceFirestore()..otherDeviceClaims = false;
+      await racing.collection('items').doc('a').set({
+        'title': 'Black Backpack',
+        'status': 'Found',
+      });
+
+      expect(
+        ItemRemoteDataSource(firestore: racing).claimItem('a'),
+        throwsA(
+          isA<FirebaseException>().having(
+            (e) => e.code,
+            'code',
+            'permission-denied',
+          ),
+        ),
+      );
     });
   });
 

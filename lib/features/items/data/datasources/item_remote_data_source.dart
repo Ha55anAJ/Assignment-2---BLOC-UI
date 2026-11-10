@@ -99,12 +99,31 @@ class ItemRemoteDataSource {
   ///
   /// A transaction reads the document and writes it back as one atomic step.
   /// If another device changes the document between the read and the write,
-  /// Firestore throws this attempt away and runs the handler again with the
-  /// fresh data. So when two people tap "Claimed" at the same moment, one
-  /// transaction claims the item and the other re-reads it, sees that it is
-  /// already claimed and writes nothing. `claimedAt` is therefore set exactly
-  /// once.
-  Future<ClaimOutcome> claimItem(String id) {
+  /// the losing attempt is never applied: Firestore either re-runs the handler
+  /// with the fresh data (which then sees the item is already claimed and
+  /// writes nothing), or, because `firestore.rules` only allows claiming an
+  /// item that is still Lost or Found, rejects the commit with
+  /// `permission-denied`. Either way exactly one claim wins and `claimedAt` is
+  /// set once.
+  Future<ClaimOutcome> claimItem(String id) async {
+    try {
+      return await _claimInTransaction(id);
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') rethrow;
+
+      // Tell "someone else claimed it a moment ago" apart from a real
+      // permission problem by reading the item again from the server.
+      final snapshot = await _rawItems
+          .doc(id)
+          .get(const GetOptions(source: Source.server));
+      if (!snapshot.exists) return ClaimOutcome.notFound;
+      final status = ItemStatus.fromLabel(snapshot.get('status') as String);
+      if (status == ItemStatus.claimed) return ClaimOutcome.alreadyClaimed;
+      rethrow;
+    }
+  }
+
+  Future<ClaimOutcome> _claimInTransaction(String id) {
     // Create a reference to the document the transaction will use
     final itemRef = _rawItems.doc(id);
 
