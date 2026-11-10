@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "396811465434",
+    "project_id": "app-dev-exam",
+    "storage_bucket": "app-dev-exam.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:396811465434:android:3a482c9f28c4e34e2dabe3",
+        "android_client_info": {
+          "package_name": "com.example.app_dev_exam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSbKgn6hstBJ2cdVhKHTKw8OcrhFoxnbI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:396811465434:android:4df6238b50111d662dabe3",
+        "android_client_info": {
+          "package_name": "edu.iba.lost_found"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSbKgn6hstBJ2cdVhKHTKw8OcrhFoxnbI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
