@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// Security rules for the Campus Lost & Found app.
+//
+// There is no sign-in in this assignment, so anyone with the app can read,
+// post and delete. The rules still protect the shape of the data:
+//   - a new item must have every field, with sensible lengths, and start as
+//     Lost or Found;
+//   - the only allowed update is Lost/Found -> Claimed, touching nothing but
+//     status and claimedAt. Together with the transaction in the app, this
+//     means an item can be claimed once and never "un-claimed".
+//
+// Deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isText(value, maxLength) {
+      return value is string
+        && value.trim().size() > 0
+        && value.size() <= maxLength;
+    }
+
+    function isValidNewItem(item) {
+      return item.keys().hasAll(['title', 'category', 'location', 'status',
+                                 'description', 'postedBy', 'createdAt'])
+        && item.keys().hasOnly(['title', 'category', 'location', 'status',
+                                'description', 'postedBy', 'createdAt',
+                                'claimedAt'])
+        && isText(item.title, 60)
+        && isText(item.category, 30)
+        && isText(item.location, 80)
+        && isText(item.description, 300)
+        && isText(item.postedBy, 60)
+        && item.status in ['Lost', 'Found']
+        && item.createdAt is timestamp
+        && item.get('claimedAt', null) == null;
+    }
+
+    match /items/{itemId} {
+      allow read: if true;
+
+      allow create: if isValidNewItem(request.resource.data);
+
+      allow update: if resource.data.status in ['Lost', 'Found']
+        && request.resource.data.status == 'Claimed'
+        && request.resource.data.claimedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'claimedAt']);
+
+      allow delete: if true;
+    }
+
+    // Marker written once by the in-app seed script.
+    match /meta/seed {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['seededAt', 'count']);
+    }
+  }
+}
