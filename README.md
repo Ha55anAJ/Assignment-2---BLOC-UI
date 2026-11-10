@@ -51,13 +51,21 @@ later does not bring them back.
    *already claimed* and write nothing;
 3. otherwise update `status` to `Claimed` and set `claimedAt`.
 
-If another device changes the document between the read and the write,
-Firestore discards the attempt and re-runs the handler with fresh data, so
-only one of two simultaneous taps succeeds. The other gets "Someone has
-already marked this item as claimed". On the device itself, the claim button
-is disabled while the request runs, and the bloc drops repeated taps
-(`droppable()` from `bloc_concurrency`). `firestore.rules` also allows only
-Lost/Found → Claimed, so an item cannot be un-claimed.
+If another device changes the document between the read and the write, the
+losing attempt is never applied. Firestore either re-runs the handler with
+fresh data, or rejects the commit with `permission-denied` because
+`firestore.rules` only allows claiming an item that is still Lost or Found.
+In the second case the app re-reads the item from the server and reports
+"Someone has already marked this item as claimed" rather than a permission
+error. Either way, exactly one of several simultaneous taps succeeds, and an
+item can never be un-claimed.
+
+On the device itself, the claim button is disabled while the request runs,
+and the bloc drops repeated taps (`droppable()` from `bloc_concurrency`).
+
+`integration_test/claim_race_test.dart` checks this against the real
+project: it fires three claims at one document at the same time and expects
+exactly one to win.
 
 ## Structure
 
@@ -121,3 +129,10 @@ flutter test
 The tests use `fake_cloud_firestore`, so they need no network or Firebase
 project. `test/widget_test.dart` runs the whole app (screens, blocs,
 repository and data source) against the fake database.
+
+The concurrent-claim test needs a device or simulator and talks to the real
+Firestore project (it creates one throwaway item and deletes it again):
+
+```bash
+flutter test integration_test -d <device id>
+```
