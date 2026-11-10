@@ -108,6 +108,12 @@ class _Header extends StatelessWidget {
                 final subtitle = _subtitle(state);
                 return AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
+                  // Keep the old and new lines left-aligned while they
+                  // cross-fade, instead of centering them on each other.
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [...previousChildren, ?currentChild],
+                  ),
                   child: Text(
                     subtitle,
                     key: ValueKey(subtitle),
@@ -212,11 +218,7 @@ class _ItemsList extends StatelessWidget {
                     title: 'Nothing posted yet',
                     message:
                         'Lost something, or found something that isn’t '
-                        'yours? Post it so the campus can help.',
-                    actionLabel: 'Post an item',
-                    actionIcon: Icons.add_rounded,
-                    onAction: () =>
-                        Navigator.of(context).push(AddItemPage.route()),
+                        'yours? Tap “Post an item” so the campus can help.',
                   ),
                 ),
               );
